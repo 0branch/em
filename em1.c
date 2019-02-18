@@ -863,18 +863,18 @@ onhup()
     sigset(SIGINT, SIG_IGN);
     sigset(SIGHUP, SIG_IGN);
     /* if there are lines in file and file was */
-    /* not written since last update, save in ed.hup, or $HOME/ed.hup */
+    /* not written since last update, save in em.hup, or $HOME/em.hup */
     if (dol > zero && fchange == 1) {
         addr1 = zero+1;
         addr2 = dol;
-        io = creat("ed.hup", 0666);
+        io = creat("em.hup", 0666);
         if(io < 0 && home) {
             char    *fn;
 
             fn = calloc(strlen(home) + 8, sizeof(char));
             if(fn) {
                 strcpy(fn, home);
-                strcat(fn, "/ed.hup");
+                strcat(fn, "/em.hup");
                 io = creat(fn, 0666);
                 free(fn);
             }

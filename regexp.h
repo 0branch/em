@@ -33,6 +33,8 @@ POSSIBILITY OF SUCH DAMAGE. */
 
 /* SCCSID="@(#)regexp.h	3.0	4/21/86"	*/
 /* Based on:	(SYSTEM V)   regexp.h	1.2	*/
+#include "d_em.h"
+
 #define	CBRA	2
 #define	CCHR	4
 #define	CDOT	8
@@ -69,8 +71,8 @@ register char *ep;
 char *instring, *endbuf;
 {
 	INIT	/* Dependent declarations and initializations */
-	register c;
-	register eof = seof;
+	int c;
+	int eof = seof;
 	char *lastep = instring;
 	int cclcnt;
 	char bracket[NBRA], *bracketp;
@@ -254,10 +256,9 @@ char *instring, *endbuf;
 	}
 }
 
-step(p1, p2)
-register char *p1, *p2;
+int step(char* p1, char* p2)
 {
-	register c;
+	int c;
 
 	if(circf) {
 		loc1 = p1;
