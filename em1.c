@@ -29,6 +29,23 @@ bugs:
 	should not use printf in substitute()
 	(for space reasons).
  */
+ 
+/* ATS 2019 - The following patches were applied
+ *
+ * Steve Eisen of CUNY/UCC - 5/77
+ * 	'~' command is equivalent to '&' command, but leaves dot
+		on the first line printed.
+	'e' with no argument re-edits the current file.
+
+ *	Modified Dec 1977 Peter C of KENT
+ *	To stop quiting if any file changes have been made
+ *	The algorithm for this is not perfect and will ask
+ *	Are you sure? in some cases where no changes have been made
+ *	but in general this will stop the deletion of lots of
+ *	data which has been typed in by typing 'q' accidentally
+ *	Also adds 'j' command joins two (or more lines)
+ *	Nobody is using 'l' command so remove it for space reasons
+*/
 
 /* this file contains all of the code except that used in the 'o' command.
 	that is in a second segment called em2.c */
@@ -44,6 +61,7 @@ bugs:
 #include <fcntl.h>
 #include <unistd.h>
 
+#define NOL 1
 
 /* screen dimensions */
 #define LINES	18
@@ -88,6 +106,10 @@ int	elfic	= 0;	/* true if "elfic" (-e) flag */
 int firstime	= 1;	/* ugh - used to frigg initial "read" */
 int	peekc;
 int	lastc;
+int	lastkey;
+int	peekkey;
+int	keyboard = 2;	/* filedes for keyboard irrespective
+				of source and destination */
 char	unixbuffer [UNIXBUFL];
 char	savedfile[FNSIZE];
 char	file[FNSIZE];
@@ -113,7 +135,10 @@ struct sigaction	onhup;
 struct sigaction	onquit;
 int	vflag	= 0;
 int	xflag	= 0;	/*used in 'xchange' command */
+int filealtered = 0;	/* Added Peter C to stop quiting if any changes in source made */
+#ifndef NOL
 int	listf;
+#endif
 int	col;
 char	*globp;
 int	tfile =	-1;
@@ -134,6 +159,21 @@ char	TMPERR[] = "TMP";
 int	names[26];
 char	*braslist[NBRA];
 char	*braelist[NBRA];
+
+/* Structure for stat - added by Peter C */
+struct finode
+{	int	fill[2];
+	int	flags;
+	char	links;
+	char	fuid;
+	char	fgid;
+	char	s0;
+	int	fill1[13];
+};
+int oldmode = 0666;		/* Contains previous file access mode for resetting */
+char termsarea[38];		/* Area for terms call used by pageoff() and pageon() */
+int pstore;			/* old value of page length */
+
 sigjmp_buf jmpbuf;
 unsigned nlall = 128;
 
@@ -207,8 +247,8 @@ int main(int argc, char **argv)
 		while (*p1) {
 			switch (*p1++) {
 		case 'q':
-                                sigaction(SIGHUP, (struct sigaction*)SIG_DFL, &onhup);
-                                break;
+                sigaction(SIGHUP, (struct sigaction*)SIG_DFL, &onhup);
+                break;
 		case 'e':
 				elfic = 1;
 				break;
@@ -320,8 +360,7 @@ void commands(int prompt)
 			error;
 		setnoaddr();
 		if ((peekc = getchr()) != ' ')
-			error;
-		savedfile[0] = 0;
+			savedfile[0] = 0;
 		init();
 		addr2 = zero;
 		goto caseread;
@@ -330,7 +369,7 @@ void commands(int prompt)
 		if (elfic)
 			error;
 		setnoaddr();
-		if ((c = getchr()) != '\n') {
+		if ((c = getchar()) == ' ') {
 			peekc = c;
 			savedfile[0] = 0;
 			filename();
@@ -344,20 +383,31 @@ void commands(int prompt)
 
 	case 'h':
 		newline();
-		if((fd = open("emhelp",0))<0) {
-			putstr("emhelp not found");
-			continue;
-		}
-			while (n = read( fd, linebuf, 512))
-				write(1, linebuf, n);
-			close( fd);
-			continue;
+		filelist("emhelp");
+		continue;
 
 	case 'i':
 		setdot();
 		nonzero();
 		newline();
 		append(gettty, addr2-1);
+		continue;
+		
+	case 'j':
+		if(addr2 == 0)
+		{	addr1 = dot;
+			addr2 = dot+1;
+		}
+		else
+		if(addr1 == addr2) addr2++;
+		else
+		if(addr1 > addr2)
+			error;
+		nonzero();
+ 
+		newline();
+		if(join())
+			error;
 		continue;
 
 	case 'k':
@@ -379,8 +429,10 @@ void commands(int prompt)
 		addr1 = addr2;
 		goto print;
 
+#ifndef NOL
 	case 'l':
 		listf++;
+#endif
 	case 'p':
 		newline();
 	print:
@@ -391,7 +443,9 @@ void commands(int prompt)
 			putstr(em_getline(*a1++));
 		while (a1 <= addr2);
 		dot = addr2;
+#ifndef NOL
 		listf = 0;
+#endif
 		continue;
 
  	case 'o':
@@ -402,6 +456,11 @@ void commands(int prompt)
 	case 'q':
 		setnoaddr();
 		newline();
+		if(filealtered && elfic == 0)
+		{
+			if(!getyes())
+			continue;
+		}
 		if (elfic) {
 			firstime = 1;
 			goto writeout;
@@ -412,6 +471,8 @@ void commands(int prompt)
 
 	case 'r':
 	caseread:
+		c = filealtered;		/* save current file altered status */
+		if(!firstime) c = 1;
 		filename();
 		if ((io = open(file, 0)) < 0) {
 			lastc = '\n';
@@ -421,6 +482,7 @@ void commands(int prompt)
 		ninbuf = 0;
 		append(getfile, addr2);
 		exfile();
+		filealtered = c;		/* restore file altered status */
 		continue;
 
 	case 'x':
@@ -443,6 +505,10 @@ void commands(int prompt)
 	case 'w':
 		if (elfic)
 			error;
+			c  = getchar();	/* Added by Peter C to allow wq command */
+		if(c == 'q' || c == 'Q')
+		{	c == 'q';	}
+		else peekc = c;
 	writeout:
 		setall();
 		nonzero();
@@ -455,11 +521,14 @@ void commands(int prompt)
 		}
 		else
 			filename ();
+		filealtered = 0;		/* Added Peter C */
 		if ((io = creat(file, 0666)) < 0)
 			error;
 		putfile();
 		exfile();
-		if (elfic)
+		if(oldmode != 0666)
+			chmod(file, oldmode);
+		if (elfic || c == 'q')
 			goto quitit;
 		continue;
 
@@ -476,9 +545,13 @@ void commands(int prompt)
 		putchr(FORM);
 		a1 = addr1-1;
 		while (++a1 <= addr2) putstr(em_getline(*a1));
-		dot = addr2;
+		if (c == '~')
+			dot = addr1;
+		else
+			dot = addr2;
 		continue;
 
+	case '~':
 	case '&':
 		setdot();
 		newline();
@@ -673,10 +746,17 @@ void newline()
 	if ((c = getchr()) == '\n')
 		return;
 	c = c >= 'A' && c <= 'Z' ? c + 32 : c;
+#ifdef NOL
+	if(c == 'p'){
+#endif
+#ifndef NOL
 	if (c=='p' || c=='l') {
+#endif
 		pflag++;
+#ifndef NOL
 		if (c=='l')
 			listf++;
+#endif
 		if (getchr() == '\n')
 			return;
 	}
@@ -747,7 +827,9 @@ void errfunc()
 {
 	register int c;
 
+#ifndef NOL
 	listf = 0;
+#endif
 	putstr("?");
 	count = 0;
 	lseek(0, 0,  SEEK_END);
@@ -780,6 +862,17 @@ char getchr()
 		return(lastc = EOF);
 	lastc &= 0177;
 	return(lastc);
+}
+
+int getkey(void)
+{
+	if(lastkey = peekkey) {
+		peekkey = 0;
+		return(lastkey);
+	}
+	if(read(keyboard, &lastkey, 1) < 0) return(lastkey = EOF);
+	lastkey &= 0177;
+	return(lastkey);
 }
 
 int gettty()
@@ -867,7 +960,8 @@ int append(int (*f)(), int *a)
   register int *a2;
   register int *rdot;
   int nline, tl;
-
+  
+    filealtered = 1;
 	nline = 0;
 	dot = a;
 	while ((*f)() == 0) {
@@ -944,7 +1038,8 @@ void callunix()
 void delete()
 {
 	register int *a1, *a2, *a3;
-
+	
+	filealtered = 1;
 	nonzero();
 	a1 = addr1;
 	a2 = addr2+1;
@@ -1287,6 +1382,7 @@ char *place(char *asp, char *al1,char * al2)
 {
 	register char *sp, *l1, *l2;
 
+	filealtered = 1;
 	sp = asp;
 	l1 = al1;
 	l2 = al2;
@@ -1638,6 +1734,7 @@ void putchr(int ac)
 
 	lp = linp;
 	c = ac;
+#ifndef NOL
 	if (listf) {
 		col++;
 		if (col >= 72) {
@@ -1665,6 +1762,7 @@ void putchr(int ac)
 			goto out;
 		}
 	}
+#endif
 	*lp++ = c;
 out:
 	if(c == '\n' || lp >= &line[64]) {
@@ -1693,3 +1791,48 @@ out:
 /* 	return(b[0]); */
 /* } */
 /*  *\/ */
+
+int getyes(void)
+{	register char result, c;
+	putstr("Are you sure?");
+	result = c = getkey();
+	while(c != '\n') c = getkey();
+	return((result & ~040) == 'Y') ;
+}
+
+/* Routine to list a file */
+void filelist(char *fi)
+{	register int fd, n;
+	register char *sp;
+	char listbuf[512];
+	if((fd = open(fi, 0)) <0)
+	{	sp = fi;
+		while(*sp)
+			putchr(*sp++);
+		putstr(" not found");
+		return;
+	}
+	while(n = read(fd, listbuf, 512))
+		write(1, listbuf, n);
+	close(fd);
+}
+
+/* Routine to join lines - added Peter C Dec 1977 */
+
+int join(char *s, char *d)
+{
+	register *a1;
+	d = genbuf;			/* destination is genbuf */
+	a1 = addr1;
+
+	do
+	{	s = em_getline(*a1++);
+		while(*d++ = *s++)
+			if(d >= &genbuf[LBSIZE]) return(1);
+		d--;
+	} while( a1 <= addr2);
+	delete();	/* delete old lines */
+	linebp = genbuf;
+	append(getsub, addr1-1);
+	return(0);
+}
