@@ -605,12 +605,12 @@ void commands(int prompt)
           case '>':
                 newline();
                  vflag = vflag>0? 0: vflag;
-		siglongjmp(jmpbuf,1);
+		longjmp(savej, 1);
 
 	case '<':
                  newline();
 		 vflag = 1;
-		siglongjmp(jmpbuf,1);
+		longjmp(savej, 1);
 
 	case '=':
 		setall();
