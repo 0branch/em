@@ -90,8 +90,8 @@ static enum { RESET, RAW, CBREAK } ttystate = RESET;
 
 
 void op(size_t inglob)
-{	register int *a1;
-	register char *lp, *sp;
+{	int *a1;
+	char *lp, *sp;
 	char seof, ch;
 	int t, nl;
 
@@ -221,7 +221,7 @@ int inword(char c)
 }
 
 int rescan()
-{	register char *lp, *sp;
+{	char *lp, *sp;
 
 	if(savethresh) { threshold = savethresh; savethresh = 0; }
 	lp = linebuf;
@@ -236,7 +236,7 @@ int rescan()
 int gopen()
 	/*leaves revised line in linebuf,
 	returns 0 if more to follow, EOF if last line */
-{	register char *lp, *sp, *rp;
+{	char *lp, *sp, *rp;
 	char ch, *br, *pr;
 	int tabs;
 	int retcode, savint, pid, rpid;
@@ -326,32 +326,32 @@ int gopen()
 				lp = linebuf; sp = genbuf;
 				tabs = 0;
 				goto verify;
-
-/* 			case CTRLV:	/\* verify spelling *\/ */
-/* 				rp = sp; */
-/* 				pr = unixbuffer+UNIXBUFL-2; */
-/* 				*pr = 0; */
-/* 				while(*(--rp) == SPACE); */
-/* 				while(inword(*rp) && rp >= genbuf) */
-/* 					*(--pr) = *rp--; */
-/* 				if(*pr == 0) goto backquery; */
-/* 				putstr("!!"); */
-/* 				setcook(); */
-/* 				if((pid = fork()) == 0) */
-/* 					{signal(SIGHUP, onhup); */
-/* 					  signal(SIGQUIT, onquit); */
-/* 					  execl("/bin/spell", "spell", pr, 0); */
-/* 					  putstr("sorry, can't spell today"); */
-/* 					  exit(); */
-/* 				} */
-/* 				savint = signal(SIGINTR,1); */
-/* 				while((rpid = wait(&retcode)) != pid */
-/* 					 && rpid != -1); */
-/* 				signal(SIGINTR, savint); */
-/* 				setraw(); */
-/* 				putstr("!!"); */
-/* 				goto verify; */
-
+		/*
+ 			case CTRLV:	/\* verify spelling *\/
+ 				rp = sp;
+ 				pr = unixbuffer+UNIXBUFL-2;
+ 				*pr = 0;
+ 				while(*(--rp) == SPACE);
+ 				while(inword(*rp) && rp >= genbuf)
+ 					*(--pr) = *rp--;
+ 				if(*pr == 0) goto backquery;
+ 				putstr("!!");
+ 				setcook();
+ 				if((pid = fork()) == 0)
+ 					{signal(SIGHUP, onhup);
+ 					  signal(SIGQUIT, onquit);
+ 					  execl("/bin/spell", "spell", pr, 0);
+ 					  putstr("sorry, can't spell today");
+ 					  exit();
+ 				}
+ 				savint = signal(SIGINTR,1);
+ 				while((rpid = wait(&retcode)) != pid
+ 					 && rpid != -1);
+ 				signal(SIGINTR, savint);
+ 				setraw();
+ 				putstr("!!");
+ 				goto verify;
+		*/
 
 			case CTRLW:	/* forward one word */
 				if(*lp == '\0') goto backquery;
@@ -468,7 +468,7 @@ int gopen()
 
 
 int getopen()  /* calls gopen, deals with multiple lines etc. */
-{	register char *lp, *sp;
+{	char *lp, *sp;
 	if (oflag == EOF) return EOF;
 
 /* otherwise, multiple lines */
@@ -489,7 +489,7 @@ void putch(char ch)
 { write(1, &ch, 1); }
 
 void putb(char *ptr)	/*display string */
-{	register char *p;
+{	char *p;
 
 	p = ptr;
 	if(*p == '\0') return;
@@ -509,4 +509,3 @@ void help()
 	putstr("	RUBOUT	exit unchanged		@	delete line backward\n");
 	putstr("	Other characters (including RETURN) inserted as typed");
 }
-
