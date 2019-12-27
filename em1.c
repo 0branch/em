@@ -51,13 +51,6 @@ bugs:
 /* this file contains all of the code except that used in the 'o' command.
 	that is in a second segment called em2.c */
 
-/* ATS 2019 - replaced all registers with their modern counterparts
- * We don't need to worry about saving 0.2 seconds storing often used
- * variables in registers, it's old pre-K&R C stuff, modern compilers
- * would ignore them and store them by default anyway.  The compiler
- * is smarter than us, let it do it's job.
-*/ 
-
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -139,8 +132,8 @@ char	*linebp;
 int	ninbuf;
 int	io;
 int	pflag;
-struct sigaction	onhup;
-struct sigaction	onquit;
+static void	(*oldhup)(), (*oldintr)();
+static void	(*oldquit)(), (*oldpipe)();
 int	vflag	= 0;
 int	xflag	= 0;	/*used in 'xchange' command */
 int filealtered = 0;	/* Added Peter C to stop quiting if any changes in source made */
@@ -219,7 +212,6 @@ void init();
 void move(int cflag);
 void newline();
 void nonzero();
-void onintr(int );
 char *place(char *asp, char *al1,char * al2);
 void putchr(int ac);
 void putd();
@@ -231,31 +223,44 @@ void screensplit();
 void setall();
 void setdot();
 void setnoaddr();
+static void	onpipe(int);
+static void	onhup(int);
+static void	onintr(int);
 void substitute(size_t inglob);
 void underline (char *line, char *l1,char * l2,char * score);
 void callunix();
+void terminate();
+static char	*home;
+
+static jmp_buf	savej;
+
+
+static void
+onpipe(int sig)
+{
+	error;
+}
 
 int main(int argc, char **argv)
 {
 	char *p1, *p2;
         
-        struct sigaction    act;
-        act.sa_handler = SIG_IGN;
-        sigemptyset(&act.sa_mask);
-        act.sa_flags = 0;
-
-        sigaction(SIGQUIT, &act , &onquit);
-        sigaction(SIGHUP, &act, &onhup);
+	oldquit = signal(SIGQUIT, SIG_IGN);
+	signal(SIGTERM, terminate);
+	oldhup = signal(SIGHUP, SIG_IGN);
+	oldintr = signal(SIGINT, SIG_IGN);
+	oldpipe = signal(SIGPIPE, onpipe);
         int lastc = 0;
         while (*(*argv+lastc+1) != '\0') lastc++;
 	if(*(*argv+lastc) == 'm') vflag = 1;
 	argv++;
 	if (argc > 1 && **argv=='-') {
 		p1 = *argv+1;
+		home = getenv("HOME");
 		while (*p1) {
 			switch (*p1++) {
 		case 'q':
-                sigaction(SIGHUP, (struct sigaction*)SIG_DFL, &onhup);
+                signal(SIGQUIT, SIG_DFL);
                 break;
 		case 'e':
 				elfic = 1;
@@ -285,20 +290,23 @@ int main(int argc, char **argv)
 	if (vflag>0) putstr("Editor");
 	init();
         
-        struct sigaction	oldint;
-        sigaction(SIGINT, NULL, &oldint);
-	if (oldint.sa_handler != SIG_IGN) {
-                  struct sigaction    act;
-                  act.sa_handler = onintr;
-                  sigemptyset(&act.sa_mask);
-                  act.sa_flags = 0;
-                  // onintr
-                  sigaction(SIGINT, &act, NULL);
-        }
-     
-	sigsetjmp(jmpbuf,1);
+	if (oldintr != SIG_IGN)
+		signal(SIGINT, onintr);
+	if (oldhup != SIG_IGN)
+		signal(SIGHUP, onhup);
+		
+	setjmp(savej);
 	commands(vflag);
 	unlink(tfname);
+}
+
+void terminate()
+{
+	if (dol != zero)
+		creat("saved.file", 0666);
+		putstr("System going down - tmp file written to \"saved.file\""); 
+	unlink(tfname);
+	exit(1);
 }
 
 void commands(int prompt)
@@ -824,11 +832,45 @@ void exfile()
 	}
 }
 
-void onintr(int signo)
+void onintr(int sig)
 {
+	signal(SIGINT, onintr);
 	putchr('\n');
 	lastc = '\n';
 	error;
+}
+
+static void
+onhup(int sig)
+{
+	signal(SIGINT, SIG_IGN);
+	signal(SIGHUP, SIG_IGN);
+	/*
+	 * if there are lines in file and file was not written
+	 * since last update, save in em.hup, or $HOME/em.hup
+	 */
+	if (dol > zero && filealtered == 1) {
+		addr1 = zero+1;
+		addr2 = dol;
+		io = creat("em.hup",
+		    S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH);
+		if (io < 0 && home) {
+			char	*fn;
+
+			fn = (char *)calloc(strlen(home) + 8, sizeof (char));
+			if (fn) {
+				strcpy(fn, home);
+				strcat(fn, "/em.hup");
+				io = creat(fn, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP
+				    |S_IROTH|S_IWOTH);
+				free(fn);
+			}
+		}
+		if (io > 0)
+			putfile();
+	}
+	filealtered = 0;
+	exit(0);
 }
 
 void errfunc()
@@ -851,7 +893,7 @@ void errfunc()
 		close(io);
 		io = -1;
 	}
-	siglongjmp(jmpbuf,1);
+	longjmp(savej, 1);
 }
 
 char getchr()
@@ -999,6 +1041,7 @@ int append(int (*f)(), int *a)
 
 void callunix()
 {
+	void (*savint)();
 	int  pid, rpid;
         struct sigaction   saveint;
 	int retcode;
@@ -1027,19 +1070,14 @@ void callunix()
 	}
 	setnoaddr();
 	if ((pid = fork()) == 0) {
-                sigaction(SIGQUIT, &onquit, NULL);
-                sigaction(SIGHUP, &onhup, NULL);
+		signal(SIGHUP, oldhup);
+		signal(SIGQUIT, oldquit);
 		execl ("/bin/sh", "sh", "-c", unixbuffer, (char *)0);
 		exit(0100);
 	}
-        struct sigaction    act;
-        act.sa_handler = SIG_IGN;
-        sigemptyset(&act.sa_mask);
-        act.sa_flags = 0;
-
-        sigaction(SIGINT, &act, &saveint);   
+        savint = signal(SIGINT, SIG_IGN);  
 	while ((rpid = wait(&retcode)) != pid && rpid != -1);
-        sigaction(SIGHUP, &saveint, NULL);
+        signal(SIGINT, savint);
 	putstr("!");
 }
 
