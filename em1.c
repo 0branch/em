@@ -24,6 +24,7 @@
 		(the help is in /usr/lib/emhelp)
 
     Port to modern unix (posix, c99) pierre.gaston@gmail.com 2012
+    Additional tty patches and merges from other variants ats 2019
 
 bugs:
 	should not use printf in substitute()
