@@ -24,7 +24,6 @@
 		(the help is in /usr/lib/emhelp)
 
     Port to modern unix (posix, c99) pierre.gaston@gmail.com 2012
-    Additional tty patches and merges from other variants ats 2019
 
 bugs:
 	should not use printf in substitute()
@@ -50,6 +49,13 @@ bugs:
 
 /* this file contains all of the code except that used in the 'o' command.
 	that is in a second segment called em2.c */
+
+/* ATS 2019 - replaced all registers with their modern counterparts
+ * We don't need to worry about saving 0.2 seconds storing often used
+ * variables in registers, it's old pre-K&R C stuff, modern compilers
+ * would ignore them and store them by default anyway.  The compiler
+ * is smarter than us, let it do it's job.
+*/ 
 
 #include <signal.h>
 #include <stdio.h>
@@ -230,7 +236,7 @@ void callunix();
 
 int main(int argc, char **argv)
 {
-	register char *p1, *p2;
+	char *p1, *p2;
         
         struct sigaction    act;
         act.sa_handler = SIG_IGN;
@@ -296,8 +302,8 @@ int main(int argc, char **argv)
 
 void commands(int prompt)
 {
-	register int *a1, c;
-	register char *p;
+	int *a1, c;
+	char *p;
 	char *p1,*p2;
 	int fd, r, n;
 
@@ -614,7 +620,7 @@ void commands(int prompt)
 
 int * address()
 {
-	register int *a1, minus, c;
+	int *a1, minus, c;
 	int n, relerr;
 
 	minus = 0;
@@ -742,7 +748,7 @@ void nonzero()
 
 void newline()
 {
-	register int c;
+	int c;
 
 	if ((c = getchr()) == '\n')
 		return;
@@ -766,8 +772,8 @@ void newline()
 
 void filename()
 {
-	register char *p1, *p2;
-	register int c;
+	char *p1, *p2;
+	int c;
 
 	count = 0;
 	c = getchr();
@@ -826,7 +832,7 @@ void onintr(int signo)
 
 void errfunc()
 {
-	register int c;
+	int c;
 
 #ifndef NOL
 	listf = 0;
@@ -878,9 +884,9 @@ int getkey(void)
 
 int gettty()
 {
-       register int c;
-       register char * gf;
-       register char *p;
+    int c;
+    char * gf;
+    char *p;
 
 	p = linebuf;
 	gf = globp;
@@ -904,8 +910,8 @@ int gettty()
 
 int getfile()
 {
-	register int c;
-	register char *lp, *fp;
+	int c;
+	char *lp, *fp;
 
 	lp = linebuf;
 	fp = nextip;
@@ -931,8 +937,8 @@ int getfile()
 void  putfile()
 {
 	int *a1;
-	register char *fp, *lp;
-	register int nib;
+	char *fp, *lp;
+	int nib;
 
 	nib = 512;
 	fp = genbuf;
@@ -957,9 +963,9 @@ void  putfile()
 
 int append(int (*f)(), int *a)
 {
-  register int *a1;
-  register int *a2;
-  register int *rdot;
+  int *a1;
+  int *a2;
+  int *rdot;
   int nline, tl;
   
     filealtered = 1;
@@ -992,7 +998,7 @@ int append(int (*f)(), int *a)
 
 void callunix()
 {
-	register int  pid, rpid;
+	int  pid, rpid;
         struct sigaction   saveint;
 	int retcode;
 	char c,*lp,*fp;
@@ -1038,7 +1044,7 @@ void callunix()
 
 void delete()
 {
-	register int *a1, *a2, *a3;
+	int *a1, *a2, *a3;
 	
 	filealtered = 1;
 	nonzero();
@@ -1057,8 +1063,8 @@ void delete()
 
 char *em_getline(int tl)
 {
-	register char *bp, *lp;
-	register int nl;
+	char *bp, *lp;
+	int nl;
 
 	lp = linebuf;
 	bp = getblock(tl, READ);
@@ -1074,8 +1080,8 @@ char *em_getline(int tl)
 
 int putline()
 {
-	register char *bp, *lp;
-	register int nl;
+	char *bp, *lp;
+	int nl;
 	int tl;
 
 	lp = linebuf;
@@ -1102,7 +1108,7 @@ int putline()
 char *getblock(int atl, int iof)
 {
 	/* extern read(), write(); */
-	register int bno, off;
+	int bno, off;
 	
 	bno = (atl>>8)&0377;
 	off = (atl<<1)&0774;
@@ -1142,8 +1148,8 @@ void blkio(int b, char *buf,  ssize_t (*iofcn)(int,  void *, size_t))
 
 void init()
 {
-	register char *p;
-	register int pid;
+	char *p;
+	int pid;
 
 	close(tfile);
 	tline = 0;
@@ -1165,9 +1171,9 @@ void init()
 
 void global(int k)
 {
-	register char *gp;
-	register int c;
-	register int *a1;
+	char *gp;
+	int c;
+	int *a1;
 	char globuf[GBSIZE];
 
 	if (globp)
@@ -1210,7 +1216,7 @@ void global(int k)
 
 void substitute(size_t inglob)
 {
-	register int gsubf, *a1, nl;
+	int gsubf, *a1, nl;
 	int nflag, nn, getsub();
 
 	gsubf = compsub();
@@ -1274,7 +1280,7 @@ int ch;
 void underline (char *line, char *l1,char * l2,char * score)
 {
 	char *ch, *ll; int i;
-	register char *p;
+	char *p;
 
 	p = line;
 	ch = " ";
@@ -1292,7 +1298,7 @@ void underline (char *line, char *l1,char * l2,char * score)
 
 void screensplit()
 {
-	register int a;
+	int a;
 
         a = LENGTH;
         while(a--) putchr(SPLIT);
@@ -1301,8 +1307,8 @@ void screensplit()
 
 int compsub()
 {
-	register int seof, c;
-	register char *p;
+	int seof, c;
+	char *p;
 	int gsubf;
 
 	gsubf = 0;
@@ -1337,7 +1343,7 @@ int compsub()
 
 int getsub()
 {
-	register char *p1, *p2;
+	char *p1, *p2;
 
 	p1 = linebuf;
 	if ((p2 = linebp) == 0)
@@ -1349,7 +1355,7 @@ int getsub()
 
 void dosub()
 {
-	register char *lp, *sp, *rp;
+	char *lp, *sp, *rp;
 	int c;
 
 	lp = linebuf;
@@ -1381,7 +1387,7 @@ void dosub()
 
 char *place(char *asp, char *al1,char * al2)
 {
-	register char *sp, *l1, *l2;
+	char *sp, *l1, *l2;
 
 	filealtered = 1;
 	sp = asp;
@@ -1397,7 +1403,7 @@ char *place(char *asp, char *al1,char * al2)
 
 void move(int cflag)
 {
-	register int *adt, *ad1, *ad2;
+	int *adt, *ad1, *ad2;
 
 	setdot();
 	nonzero();
@@ -1430,7 +1436,7 @@ void move(int cflag)
 
 void reverse(int *aa1, int *aa2)
 {
-	register int *a1, *a2, t;
+	int *a1, *a2, t;
 
 	a1 = aa1;
 	a2 = aa2;
@@ -1453,8 +1459,8 @@ int getcopy()
 
 void compile(int aeof)
 {
-	register int eof, c;
-	register char *ep;
+	int eof, c;
+	char *ep;
 	char *lastep;
 	char bracket[NBRA], *bracketp;
 	int nbra;
@@ -1562,7 +1568,7 @@ void compile(int aeof)
 
 int execute(int gf, int *addr)
 {
-	register char *p1, *p2, c;
+	char *p1, *p2, c;
 
 	if (gf) {
 		if (circfl)
@@ -1607,7 +1613,7 @@ int execute(int gf, int *addr)
 
 int advance(char* alp,char* aep)
 {
-	register char *lp, *ep, *curlp;
+	char *lp, *ep, *curlp;
 	char *nextep;
 
 	lp = alp;
@@ -1690,8 +1696,8 @@ int advance(char* alp,char* aep)
 
 int cclass(char *aset, char ac, int af)
 {
-	register char *set, c;
-	register int n;
+	char *set, c;
+	int n;
 
 	set = aset;
 	if ((c = ac) == 0)
@@ -1705,7 +1711,7 @@ int cclass(char *aset, char ac, int af)
 
 void putd()
 {
-	register int r;
+	int r;
 
         r = count %10;
         count /= 10;
@@ -1716,7 +1722,7 @@ void putd()
 
 void putstr(char *as)
 {
-	register char *sp;
+	char *sp;
 
 	sp = as;
 	col = 0;
@@ -1730,8 +1736,8 @@ char	*linp	= line;
 
 void putchr(int ac)
 {
-	register char *lp;
-	register int c;
+	char *lp;
+	int c;
 
 	lp = linp;
 	c = ac;
@@ -1778,7 +1784,7 @@ out:
 /*  * Get process ID routine if system call is unavailable. */
 /* getpid() */
 /* { */
-/* 	register f; */
+/* 	f; */
 /* 	int b[1]; */
 
 /* 	f = open("/dev/kmem", 0); */
@@ -1794,7 +1800,7 @@ out:
 /*  *\/ */
 
 int getyes(void)
-{	register char result, c;
+{	char result, c;
 	putstr("Are you sure?");
 	result = c = getkey();
 	while(c != '\n') c = getkey();
@@ -1803,8 +1809,8 @@ int getyes(void)
 
 /* Routine to list a file */
 void filelist(char *fi)
-{	register int fd, n;
-	register char *sp;
+{	int fd, n;
+	char *sp;
 	char listbuf[512];
 	if((fd = open(fi, 0)) <0)
 	{	sp = fi;
@@ -1822,7 +1828,7 @@ void filelist(char *fi)
 
 int join(char *s, char *d)
 {
-	register *a1;
+	char *a1;
 	d = genbuf;			/* destination is genbuf */
 	a1 = addr1;
 
