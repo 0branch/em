@@ -46,7 +46,13 @@ bugs:
  *	data which has been typed in by typing 'q' accidentally
  *	Also adds 'j' command joins two (or more lines)
  *	Nobody is using 'l' command so remove it for space reasons
-*/
+ 
+ * 	Mods: Ian Johnstone (AGSM)
+ *	September, 77
+ *
+ *	When receive terminate (14) signal, output current file
+ *	to "saved.file" and tell user about this - then exit.
+ */
 
 /* this file contains all of the code except that used in the 'o' command.
 	that is in a second segment called em2.c */
