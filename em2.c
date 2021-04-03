@@ -230,6 +230,7 @@ int rescan()
 				*(--lp) = 0;
 				return 0;
           }
+    return 0;
 }
 
 

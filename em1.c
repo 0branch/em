@@ -215,7 +215,7 @@ int getsub();
 int gettty();
 void global(int k);
 void init();
-void move(int cflag);
+void em_move(int cflag);
 void newline();
 void nonzero();
 char *place(char *asp, char *al1,char * al2);
@@ -233,11 +233,13 @@ static void	onpipe(int);
 static void	onhup(int);
 static void	onintr(int);
 void substitute(size_t inglob);
-void underline (char *line, char *l1,char * l2,char * score);
+void em_underline (char *line, char *l1,char * l2,char * score);
 void callunix();
 void terminate();
 static char	*home;
-
+void filelist(char *);
+int join(void);
+int getyes(void);
 static jmp_buf	savej;
 
 
@@ -442,7 +444,7 @@ void commands(int prompt)
 		continue;
 
 	case 'm':
-		move(0);
+		em_move(0);
 		continue;
 
 	case '\n':
@@ -517,7 +519,7 @@ void commands(int prompt)
 		continue;
 
 	case 't':
-		move(1);
+		em_move(1);
 		continue;
 
 	case 'v':
@@ -1311,7 +1313,7 @@ int confirmed()
 int ch;
 	if(xflag) {
 		putstr(linebuf);
-		underline(linebuf, loc1, loc2, SCORE);
+		em_underline(linebuf, loc1, loc2, SCORE);
 		ch = getchr();
 		if ( ch != '\n') { while (getchr() != '\n');
 				if ( ch != CONFIRM ) putstr("? '.' to confirm");
@@ -1322,7 +1324,7 @@ int ch;
 }
 
 
-void underline (char *line, char *l1,char * l2,char * score)
+void em_underline (char *line, char *l1,char * l2,char * score)
 {
 	char *ch, *ll; int i;
 	char *p;
@@ -1446,7 +1448,7 @@ char *place(char *asp, char *al1,char * al2)
 	return(sp);
 }
 
-void move(int cflag)
+void em_move(int cflag)
 {
 	int *adt, *ad1, *ad2;
 
@@ -1871,8 +1873,10 @@ void filelist(char *fi)
 
 /* Routine to join lines - added Peter C Dec 1977 */
 
-int join(char *s, char *d)
+int join(void)
 {
+    char *s;
+    char *d;
 	char *a1;
 	d = genbuf;			/* destination is genbuf */
 	a1 = addr1;
